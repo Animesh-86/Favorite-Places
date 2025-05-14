@@ -1,35 +1,41 @@
 import 'package:favorite_places/screens/places.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:google_fonts/google_fonts.dart';
 
 final colorScheme = ColorScheme.fromSeed(
+  seedColor: const Color(0xFF6C63FF),
   brightness: Brightness.dark,
-  seedColor: const Color.fromARGB(255, 102, 6, 247),
-  surface: const Color.fromARGB(255, 56, 49, 66),
 );
 
-final theme = ThemeData().copyWith(
-  scaffoldBackgroundColor: colorScheme.surface,
+final theme = ThemeData.dark().copyWith(
   colorScheme: colorScheme,
   textTheme: GoogleFonts.ubuntuCondensedTextTheme().copyWith(
     titleSmall: GoogleFonts.ubuntuCondensed(
-      fontWeight: FontWeight.bold,
+      fontWeight: FontWeight.w700,
+      color: Colors.white, // brighter
     ),
     titleMedium: GoogleFonts.ubuntuCondensed(
-      fontWeight: FontWeight.bold,
+      fontWeight: FontWeight.w800,
+      color: Colors.white,
     ),
     titleLarge: GoogleFonts.ubuntuCondensed(
-      fontWeight: FontWeight.bold,
+      fontWeight: FontWeight.w900,
+      color: Colors.white,
+    ),
+    bodyMedium: GoogleFonts.ubuntuCondensed(
+      fontWeight: FontWeight.w600,
+      color: Colors.white,
+    ),
+    bodyLarge: GoogleFonts.ubuntuCondensed(
+      fontWeight: FontWeight.w700,
+      color: Colors.white,
     ),
   ),
 );
 
 void main() {
-  runApp(
-      const ProviderScope(child: MyApp()),
-  );
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -38,9 +44,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Great Places',
+      title: 'Favorite Places',
       theme: theme,
-      home: PlacesScreen(),
+      home: const PlacesScreen(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }

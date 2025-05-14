@@ -34,9 +34,24 @@ class _LocationInputState extends State<LocationInput> {
 
   Future<void> _savePlace(double latitude, double longitude) async {
     final url = Uri.parse(
-        'https://maps.googleapis.com/maps/api/geocode/json?latlng=$latitude,$longitude&key=AIzaSyDLcwxUggpPZo8lcbH0TB4Crq5SJjtj4ag');
+      'https://maps.googleapis.com/maps/api/geocode/json?latlng=$latitude,$longitude&key=AIzaSyDLcwxUggpPZo8lcbH0TB4Crq5SJjtj4ag',
+    );
     final response = await http.get(url);
     final resData = json.decode(response.body);
+
+    if (resData['results'] == null || resData['results'].isEmpty) {
+      // Handle the case where no results are returned
+      setState(() {
+        _isGettingLocation = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No address found for the selected location.'),
+        ),
+      );
+      return;
+    }
+
     final address = resData['results'][0]['formatted_address'];
 
     setState(() {
@@ -90,11 +105,9 @@ class _LocationInputState extends State<LocationInput> {
   }
 
   void _selectOnMap() async {
-    final pickedLocation = await Navigator.of(context).push<LatLng>(
-      MaterialPageRoute(
-        builder: (ctx) => const MapScreen(),
-      ),
-    );
+    final pickedLocation = await Navigator.of(
+      context,
+    ).push<LatLng>(MaterialPageRoute(builder: (ctx) => const MapScreen()));
 
     if (pickedLocation == null) {
       return;
@@ -109,8 +122,8 @@ class _LocationInputState extends State<LocationInput> {
       'No location chosen',
       textAlign: TextAlign.center,
       style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-            color: Theme.of(context).colorScheme.onBackground,
-          ),
+        color: Theme.of(context).colorScheme.onBackground,
+      ),
     );
 
     if (_pickedLocation != null) {
