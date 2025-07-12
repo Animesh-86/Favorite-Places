@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:favorite_places/screens/map.dart';
 import 'package:favorite_places/models/place.dart';
+import 'package:favorite_places/config/api_keys.dart';
 
 class LocationInput extends StatefulWidget {
   const LocationInput({super.key, required this.onSelectLocation});
@@ -29,41 +30,66 @@ class _LocationInputState extends State<LocationInput> {
     }
     final lat = _pickedLocation!.latitude;
     final lng = _pickedLocation!.longitude;
-    return 'https://maps.googleapis.com/maps/api/staticmap?center=$lat,$lng=&zoom=16&size=600x300&maptype=roadmap&markers=color:red%7Clabel:A%7C$lat,$lng&key=AIzaSyDLcwxUggpPZo8lcbH0TB4Crq5SJjtj4ag';
+    return 'https://maps.googleapis.com/maps/api/staticmap?center=$lat,$lng=&zoom=16&size=600x300&maptype=roadmap&markers=color:red%7Clabel:A%7C$lat,$lng&key=${ApiKeys.googleMapsApiKey}';
   }
 
   Future<void> _savePlace(double latitude, double longitude) async {
-    final url = Uri.parse(
-      'https://maps.googleapis.com/maps/api/geocode/json?latlng=$latitude,$longitude&key=AIzaSyDLcwxUggpPZo8lcbH0TB4Crq5SJjtj4ag',
-    );
-    final response = await http.get(url);
-    final resData = json.decode(response.body);
+    if (ApiKeys.googleMapsApiKey == 'YOUR_API_KEY_HERE') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please configure your Google Maps API key in lib/config/api_keys.dart'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() {
+        _isGettingLocation = false;
+      });
+      return;
+    }
 
-    if (resData['results'] == null || resData['results'].isEmpty) {
-      // Handle the case where no results are returned
+    final url = Uri.parse(
+      'https://maps.googleapis.com/maps/api/geocode/json?latlng=$latitude,$longitude&key=${ApiKeys.googleMapsApiKey}',
+    );
+    
+    try {
+      final response = await http.get(url);
+      final resData = json.decode(response.body);
+
+      if (resData['results'] == null || resData['results'].isEmpty) {
+        setState(() {
+          _isGettingLocation = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No address found for the selected location.'),
+          ),
+        );
+        return;
+      }
+
+      final address = resData['results'][0]['formatted_address'];
+
+      setState(() {
+        _pickedLocation = PlaceLocation(
+          latitude: latitude,
+          longitude: longitude,
+          address: address,
+        );
+        _isGettingLocation = false;
+      });
+
+      widget.onSelectLocation(_pickedLocation!);
+    } catch (e) {
       setState(() {
         _isGettingLocation = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No address found for the selected location.'),
+        SnackBar(
+          content: Text('Error getting address: ${e.toString()}'),
+          backgroundColor: Colors.red,
         ),
       );
-      return;
     }
-
-    final address = resData['results'][0]['formatted_address'];
-
-    setState(() {
-      _pickedLocation = PlaceLocation(
-        latitude: latitude,
-        longitude: longitude,
-        address: address,
-      );
-      _isGettingLocation = false;
-    });
-
-    widget.onSelectLocation(_pickedLocation!);
   }
 
   void _getCurrentLocation() async {
@@ -77,6 +103,12 @@ class _LocationInputState extends State<LocationInput> {
     if (!serviceEnabled) {
       serviceEnabled = await location.requestService();
       if (!serviceEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location services are disabled'),
+            backgroundColor: Colors.orange,
+          ),
+        );
         return;
       }
     }
@@ -85,6 +117,12 @@ class _LocationInputState extends State<LocationInput> {
     if (permissionGranted == PermissionStatus.denied) {
       permissionGranted = await location.requestPermission();
       if (permissionGranted != PermissionStatus.granted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location permission denied'),
+            backgroundColor: Colors.orange,
+          ),
+        );
         return;
       }
     }
@@ -93,18 +131,49 @@ class _LocationInputState extends State<LocationInput> {
       _isGettingLocation = true;
     });
 
-    locationData = await location.getLocation();
-    final lat = locationData.latitude;
-    final lng = locationData.longitude;
+    try {
+      locationData = await location.getLocation();
+      final lat = locationData.latitude;
+      final lng = locationData.longitude;
 
-    if (lat == null || lng == null) {
-      return;
+      if (lat == null || lng == null) {
+        setState(() {
+          _isGettingLocation = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not get current location'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      _savePlace(lat, lng);
+    } catch (e) {
+      setState(() {
+        _isGettingLocation = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error getting location: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
-
-    _savePlace(lat, lng);
   }
 
   void _selectOnMap() async {
+    if (ApiKeys.googleMapsApiKey == 'YOUR_API_KEY_HERE') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please configure your Google Maps API key in lib/config/api_keys.dart'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final pickedLocation = await Navigator.of(
       context,
     ).push<LatLng>(MaterialPageRoute(builder: (ctx) => const MapScreen()));
@@ -118,11 +187,14 @@ class _LocationInputState extends State<LocationInput> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     Widget previewContent = Text(
       'No location chosen',
       textAlign: TextAlign.center,
-      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-        color: Theme.of(context).colorScheme.onBackground,
+      style: theme.textTheme.bodyLarge!.copyWith(
+        color: theme.colorScheme.onSurface,
       ),
     );
 
@@ -132,6 +204,20 @@ class _LocationInputState extends State<LocationInput> {
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: isDark 
+                ? Colors.white.withOpacity(0.1)
+                : Colors.grey.withOpacity(0.1),
+            child: Icon(
+              Icons.location_on,
+              size: 48,
+              color: theme.colorScheme.onSurface.withOpacity(0.5),
+            ),
+          );
+        },
       );
     }
 
@@ -148,11 +234,12 @@ class _LocationInputState extends State<LocationInput> {
           decoration: BoxDecoration(
             border: Border.all(
               width: 1,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+              color: theme.colorScheme.primary.withOpacity(0.2),
             ),
           ),
           child: previewContent,
         ),
+        const SizedBox(height: 8),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
